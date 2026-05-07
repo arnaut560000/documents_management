@@ -1,111 +1,25 @@
 {% extends 'base.html' %}
 {% block content %}
 <div class="row g-4 mb-4">
-    <div class="col-md-6 col-xl-3">
+    <div class="col-md-6 col-xl-4">
         <div class="metric-card metric-card-primary">
             <span class="metric-label">Total Documents</span>
             <h2>{{ total_docs }}</h2>
             <p>Everything currently tracked in the system.</p>
         </div>
     </div>
-    <div class="col-md-6 col-xl-3">
-        <div class="metric-card">
-            <span class="metric-label">Pending</span>
-            <h2>{{ pending_docs }}</h2>
-            <p>Waiting for review, routing, or action.</p>
-        </div>
-    </div>
-    <div class="col-md-6 col-xl-3">
+    <div class="col-md-6 col-xl-4">
         <div class="metric-card">
             <span class="metric-label">On Process</span>
             <h2>{{ process_docs }}</h2>
             <p>Actively moving between handlers.</p>
         </div>
     </div>
-    <div class="col-md-6 col-xl-3">
+    <div class="col-md-6 col-xl-4">
         <div class="metric-card">
-            <span class="metric-label">Approved</span>
-            <h2>{{ approved_docs }}</h2>
-            <p>Completed approvals ready for release or archive.</p>
-        </div>
-    </div>
-</div>
-
-<div class="glass-panel analytics-dashboard mb-4">
-    <div class="panel-header">
-        <div>
-            <span class="eyebrow">Analytics</span>
-            <h3 class="panel-title">Document insights</h3>
-        </div>
-        <div class="results-pill">{{ updates_last_7_days }} updates in 7 days</div>
-    </div>
-
-    <div class="analytics-summary">
-        <div>
-            <span>Open Work</span>
-            <strong>{{ open_docs }}</strong>
-        </div>
-        <div>
-            <span>Completed</span>
-            <strong>{{ completed_docs }}</strong>
-        </div>
-        <div>
-            <span>Avg Open Age</span>
-            <strong>{{ average_open_age }}d</strong>
-        </div>
-        <div>
-            <span>With Files</span>
-            <strong>{{ documents_with_files }}</strong>
-        </div>
-    </div>
-
-    <div class="analytics-grid">
-        <div class="chart-panel chart-panel-large">
-            <div class="chart-head">
-                <div>
-                    <span class="chart-kicker">Workflow</span>
-                    <h4>Status distribution</h4>
-                </div>
-            </div>
-            <div class="chart-box chart-box-tall">
-                <canvas id="statusChart"></canvas>
-            </div>
-        </div>
-
-        <div class="chart-panel">
-            <div class="chart-head">
-                <div>
-                    <span class="chart-kicker">Volume</span>
-                    <h4>Recent activity</h4>
-                </div>
-            </div>
-            <div class="chart-box">
-                <canvas id="activityChart"></canvas>
-            </div>
-        </div>
-
-        <div class="chart-panel">
-            <div class="chart-head">
-                <div>
-                    <span class="chart-kicker">Classification</span>
-                    <h4>Top categories</h4>
-                </div>
-            </div>
-            <div class="chart-box">
-                <canvas id="categoryChart"></canvas>
-            </div>
-        </div>
-
-        <div class="chart-panel">
-            <div class="chart-head">
-                <div>
-                    <span class="chart-kicker">Ownership</span>
-                    <h4>Holder workload</h4>
-                </div>
-            </div>
-            <div class="chart-box">
-                <canvas id="holderChart"></canvas>
-            </div>
+            <span class="metric-label">Settled</span>
+            <h2>{{ settled_docs }}</h2>
+            <p>Completed records ready for reference or archive.</p>
         </div>
     </div>
 </div>
@@ -215,22 +129,22 @@
         <div class="modal-body pt-0">
             <div class="row g-4">
                 <div class="col-md-6">
-                    <label class="form-label">Document No</label>
-                    <input type="text" name="doc_no" class="form-control modern-input" required>
-                </div>
-                <div class="col-md-6">
                     <label class="form-label">Title</label>
                     <input type="text" name="title" class="form-control modern-input" required>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label">Category</label>
-                    <input type="text" name="category" class="form-control modern-input">
+                    <select name="category" class="form-select modern-input" required>
+                        {% for category in category_choices %}
+                        <option value="{{ category }}">{{ category }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label">Initial Status</label>
                     <select name="current_status" class="form-select modern-input" required>
                         {% for status in status_choices %}
-                        <option value="{{ status }}" {% if status == 'Pending' %}selected{% endif %}>{{ status }}</option>
+                        <option value="{{ status }}" {% if status == 'On Process' %}selected{% endif %}>{{ status }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -332,152 +246,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
-const analyticsData = {
-    status: {{ status_breakdown|tojson }},
-    categories: {{ category_breakdown|tojson }},
-    holders: {{ holder_breakdown|tojson }},
-    activity: {{ daily_activity|tojson }}
-};
-
-const chartColors = {
-    green: '#1f7a4c',
-    greenSoft: 'rgba(31, 122, 76, 0.14)',
-    blue: '#3c8dbc',
-    yellow: '#d6a33a',
-    red: '#d9534f',
-    ink: '#16211a',
-    muted: '#647267',
-    grid: 'rgba(22, 33, 26, 0.08)'
-};
-
-if (window.Chart) {
-    Chart.defaults.font.family = "'Plus Jakarta Sans', sans-serif";
-    Chart.defaults.color = chartColors.muted;
-    Chart.defaults.plugins.legend.labels.usePointStyle = true;
-    Chart.defaults.plugins.legend.labels.boxWidth = 8;
-
-    const compactOptions = {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: { display: false },
-            tooltip: {
-                backgroundColor: '#16211a',
-                padding: 12,
-                titleFont: { weight: '800' },
-                bodyFont: { weight: '600' }
-            }
-        },
-        scales: {
-            x: {
-                grid: { display: false },
-                ticks: { font: { weight: '700' } }
-            },
-            y: {
-                beginAtZero: true,
-                grid: { color: chartColors.grid },
-                ticks: { precision: 0, font: { weight: '700' } }
-            }
-        }
-    };
-
-    new Chart(document.getElementById('statusChart'), {
-        type: 'doughnut',
-        data: {
-            labels: analyticsData.status.map(item => item.label),
-            datasets: [{
-                data: analyticsData.status.map(item => item.count),
-                backgroundColor: ['#1f7a4c', '#3c8dbc', '#d6a33a', '#27965d', '#145437', '#67b7dc', '#d9534f'],
-                borderWidth: 0,
-                hoverOffset: 8
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            cutout: '62%',
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: { padding: 16, font: { weight: '800' } }
-                },
-                tooltip: {
-                    backgroundColor: '#16211a',
-                    padding: 12,
-                    callbacks: {
-                        label: context => `${context.label}: ${context.parsed} documents`
-                    }
-                }
-            }
-        }
-    });
-
-    new Chart(document.getElementById('activityChart'), {
-        type: 'line',
-        data: {
-            labels: analyticsData.activity.map(item => item.label),
-            datasets: [{
-                label: 'Updates',
-                data: analyticsData.activity.map(item => item.count),
-                borderColor: chartColors.green,
-                backgroundColor: chartColors.greenSoft,
-                fill: true,
-                tension: 0.38,
-                pointRadius: 3,
-                pointHoverRadius: 5,
-                pointBackgroundColor: chartColors.green
-            }]
-        },
-        options: compactOptions
-    });
-
-    new Chart(document.getElementById('categoryChart'), {
-        type: 'bar',
-        data: {
-            labels: analyticsData.categories.map(item => item.label),
-            datasets: [{
-                label: 'Documents',
-                data: analyticsData.categories.map(item => item.count),
-                backgroundColor: chartColors.blue,
-                borderRadius: 8,
-                maxBarThickness: 34
-            }]
-        },
-        options: compactOptions
-    });
-
-    new Chart(document.getElementById('holderChart'), {
-        type: 'bar',
-        data: {
-            labels: analyticsData.holders.map(item => item.label),
-            datasets: [{
-                label: 'Documents',
-                data: analyticsData.holders.map(item => item.count),
-                backgroundColor: chartColors.yellow,
-                borderRadius: 8,
-                maxBarThickness: 34
-            }]
-        },
-        options: {
-            ...compactOptions,
-            indexAxis: 'y',
-            scales: {
-                x: {
-                    beginAtZero: true,
-                    grid: { color: chartColors.grid },
-                    ticks: { precision: 0, font: { weight: '700' } }
-                },
-                y: {
-                    grid: { display: false },
-                    ticks: { font: { weight: '700' } }
-                }
-            }
-        }
-    });
-}
-
 const statusModal = new bootstrap.Modal(document.getElementById('statusModal'));
 const historyModal = new bootstrap.Modal(document.getElementById('historyModal'));
 const addDocumentModalElement = document.getElementById('addDocumentModal');

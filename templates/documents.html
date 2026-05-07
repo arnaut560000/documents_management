@@ -112,25 +112,23 @@
         <div class="modal-body pt-0">
             <div class="row g-4">
                 <div class="col-md-6">
-                    <label class="form-label">Document No</label>
-                    <input type="text" name="doc_no" class="form-control modern-input" required>
-                </div>
-                <div class="col-md-6">
                     <label class="form-label">Title</label>
                     <input type="text" name="title" class="form-control modern-input" required>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label">Category</label>
-                    <input type="text" name="category" class="form-control modern-input">
+                    <select name="category" class="form-select modern-input" required>
+                        {% for category in category_choices %}
+                        <option value="{{ category }}">{{ category }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label">Initial Status</label>
                     <select name="current_status" class="form-select modern-input" required>
-                        <option value="Pending">Pending</option>
-                        <option value="On Process">On Process</option>
-                        <option value="Approved">Approved</option>
-                        <option value="Released">Released</option>
-                        <option value="Returned">Returned</option>
+                        {% for status in status_choices %}
+                        <option value="{{ status }}" {% if status == 'On Process' %}selected{% endif %}>{{ status }}</option>
+                        {% endfor %}
                     </select>
                 </div>
                 <div class="col-md-6">
@@ -181,11 +179,9 @@
             <div class="mb-3">
                 <label class="form-label">New Status</label>
                 <select id="new_status" class="form-select modern-input" required>
-                    <option value="Pending">Pending</option>
-                    <option value="On Process">On Process</option>
-                    <option value="Approved">Approved</option>
-                    <option value="Released">Released</option>
-                    <option value="Returned">Returned</option>
+                    {% for status in status_choices %}
+                    <option value="{{ status }}">{{ status }}</option>
+                    {% endfor %}
                 </select>
             </div>
             <div class="mb-3">

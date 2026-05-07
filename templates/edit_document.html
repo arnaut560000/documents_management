@@ -13,7 +13,7 @@
     <div class="row g-4">
         <div class="col-md-6">
             <label class="form-label">Document No</label>
-            <input type="text" name="doc_no" class="form-control modern-input" value="{{ document.doc_no }}" required>
+            <input type="text" class="form-control modern-input" value="{{ document.doc_no }}" readonly>
         </div>
         <div class="col-md-6">
             <label class="form-label">Title</label>
@@ -21,7 +21,11 @@
         </div>
         <div class="col-md-6">
             <label class="form-label">Category</label>
-            <input type="text" name="category" class="form-control modern-input" value="{{ document.category or '' }}">
+            <select name="category" class="form-select modern-input" required>
+                {% for category in category_choices %}
+                <option value="{{ category }}" {% if document.category == category %}selected{% endif %}>{{ category }}</option>
+                {% endfor %}
+            </select>
         </div>
         <div class="col-md-6">
             <label class="form-label">Who Has the Document?</label>

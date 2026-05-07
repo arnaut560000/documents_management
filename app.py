@@ -59,15 +59,8 @@ class Config:
         ).split(",")
         if ext.strip()
     }
-    STATUS_CHOICES = [
-        "Pending",
-        "Received",
-        "Under Review",
-        "On Process",
-        "Approved",
-        "Released",
-        "Returned",
-    ]
+    STATUS_CHOICES = ["On Process", "Settled"]
+    CATEGORY_CHOICES = ["Net Metering", "Survey", "Interruption", "Others"]
     DEFAULT_ADMIN_USERNAME = os.getenv("DEFAULT_ADMIN_USERNAME", "admin")
     DEFAULT_ADMIN_PASSWORD = os.getenv("DEFAULT_ADMIN_PASSWORD", "admin123")
 
@@ -134,7 +127,7 @@ def initialize_database():
                 title TEXT NOT NULL,
                 description TEXT,
                 category TEXT,
-                current_status TEXT NOT NULL DEFAULT 'Pending',
+                current_status TEXT NOT NULL DEFAULT 'On Process',
                 holder_user_id INTEGER,
                 file_name TEXT,
                 original_file_name TEXT,
@@ -173,6 +166,16 @@ def initialize_database():
         )
 
         ensure_column(conn, "users", "must_change_password", "INTEGER NOT NULL DEFAULT 0")
+        conn.execute(
+            """
+            UPDATE documents
+            SET current_status = CASE
+                WHEN current_status IN ('Approved', 'Released', 'Settled') THEN 'Settled'
+                ELSE 'On Process'
+            END
+            WHERE current_status NOT IN ('On Process', 'Settled')
+            """
+        )
 
         existing_admin = conn.execute(
             "SELECT id FROM users WHERE username = ?",
@@ -236,17 +239,23 @@ def get_active_users(conn=None):
     ).fetchall()
 
 
+def generate_document_number(conn):
+    for _ in range(20):
+        doc_no = str(secrets.randbelow(90000000) + 10000000)
+        existing = conn.execute("SELECT id FROM documents WHERE doc_no = ?", (doc_no,)).fetchone()
+        if not existing:
+            return doc_no
+    return uuid.uuid4().hex[:12].upper()
+
+
 def get_document_listing_data(search="", open_modal=""):
     conn = get_db()
     total_docs = conn.execute("SELECT COUNT(*) AS total FROM documents").fetchone()["total"]
-    pending_docs = conn.execute(
-        "SELECT COUNT(*) AS total FROM documents WHERE current_status = 'Pending'"
-    ).fetchone()["total"]
     process_docs = conn.execute(
         "SELECT COUNT(*) AS total FROM documents WHERE current_status = 'On Process'"
     ).fetchone()["total"]
-    approved_docs = conn.execute(
-        "SELECT COUNT(*) AS total FROM documents WHERE current_status = 'Approved'"
+    settled_docs = conn.execute(
+        "SELECT COUNT(*) AS total FROM documents WHERE current_status = 'Settled'"
     ).fetchone()["total"]
 
     if search:
@@ -274,162 +283,16 @@ def get_document_listing_data(search="", open_modal=""):
 
     listing_data = {
         "total_docs": total_docs,
-        "pending_docs": pending_docs,
         "process_docs": process_docs,
-        "approved_docs": approved_docs,
+        "settled_docs": settled_docs,
         "docs": docs,
         "users": get_active_users(conn),
         "search": search,
         "open_modal": open_modal,
         "status_choices": app.config["STATUS_CHOICES"],
+        "category_choices": app.config["CATEGORY_CHOICES"],
     }
-    listing_data.update(get_analytics_data())
     return listing_data
-
-
-def get_analytics_data():
-    conn = get_db()
-
-    total_docs = conn.execute("SELECT COUNT(*) AS total FROM documents").fetchone()["total"]
-    active_users = conn.execute(
-        "SELECT COUNT(*) AS total FROM users WHERE is_active = 1"
-    ).fetchone()["total"]
-    documents_with_files = conn.execute(
-        "SELECT COUNT(*) AS total FROM documents WHERE file_name IS NOT NULL AND file_name != ''"
-    ).fetchone()["total"]
-    completed_docs = conn.execute(
-        """
-        SELECT COUNT(*) AS total
-        FROM documents
-        WHERE current_status IN ('Approved', 'Released')
-        """
-    ).fetchone()["total"]
-    open_docs = conn.execute(
-        """
-        SELECT COUNT(*) AS total
-        FROM documents
-        WHERE current_status NOT IN ('Approved', 'Released')
-        """
-    ).fetchone()["total"]
-    average_open_age = conn.execute(
-        """
-        SELECT COALESCE(ROUND(AVG(julianday('now') - julianday(created_at)), 1), 0) AS days
-        FROM documents
-        WHERE current_status NOT IN ('Approved', 'Released')
-        """
-    ).fetchone()["days"]
-    updates_last_7_days = conn.execute(
-        """
-        SELECT COUNT(*) AS total
-        FROM document_status_history
-        WHERE updated_at >= datetime('now', '-7 days')
-        """
-    ).fetchone()["total"]
-
-    status_rows = conn.execute(
-        """
-        SELECT current_status, COUNT(*) AS total
-        FROM documents
-        GROUP BY current_status
-        """
-    ).fetchall()
-    status_totals = {row["current_status"]: row["total"] for row in status_rows}
-    status_breakdown = []
-    for status in app.config["STATUS_CHOICES"]:
-        count = status_totals.get(status, 0)
-        status_breakdown.append(
-            {
-                "label": status,
-                "count": count,
-                "percent": round((count / total_docs) * 100, 1) if total_docs else 0,
-            }
-        )
-
-    category_breakdown = [
-        {
-            "label": row["category_name"],
-            "count": row["total"],
-            "percent": round((row["total"] / total_docs) * 100, 1) if total_docs else 0,
-        }
-        for row in conn.execute(
-            """
-            SELECT COALESCE(NULLIF(TRIM(category), ''), 'Uncategorized') AS category_name,
-                   COUNT(*) AS total
-            FROM documents
-            GROUP BY category_name
-            ORDER BY total DESC, category_name ASC
-            LIMIT 8
-            """
-        ).fetchall()
-    ]
-
-    holder_breakdown = [
-        {
-            "label": row["holder_name"],
-            "count": row["total"],
-            "percent": round((row["total"] / total_docs) * 100, 1) if total_docs else 0,
-        }
-        for row in conn.execute(
-            """
-            SELECT COALESCE(u.full_name, 'Not Assigned') AS holder_name,
-                   COUNT(*) AS total
-            FROM documents d
-            LEFT JOIN users u ON d.holder_user_id = u.id
-            GROUP BY holder_name
-            ORDER BY total DESC, holder_name ASC
-            LIMIT 8
-            """
-        ).fetchall()
-    ]
-
-    daily_activity = [
-        {
-            "label": row["activity_day"],
-            "count": row["total"],
-        }
-        for row in conn.execute(
-            """
-            SELECT date(updated_at) AS activity_day, COUNT(*) AS total
-            FROM document_status_history
-            WHERE updated_at >= date('now', '-13 days')
-            GROUP BY activity_day
-            ORDER BY activity_day ASC
-            """
-        ).fetchall()
-    ]
-    max_daily_activity = max((item["count"] for item in daily_activity), default=0)
-    for item in daily_activity:
-        item["percent"] = round((item["count"] / max_daily_activity) * 100, 1) if max_daily_activity else 0
-
-    recent_activity = conn.execute(
-        """
-        SELECT h.new_status, h.old_status, h.remarks, h.updated_at,
-               d.doc_no, d.title,
-               updater.full_name AS updated_by_name,
-               holder.full_name AS holder_name
-        FROM document_status_history h
-        JOIN documents d ON h.document_id = d.id
-        LEFT JOIN users updater ON h.updated_by = updater.id
-        LEFT JOIN users holder ON h.holder_user_id = holder.id
-        ORDER BY h.updated_at DESC, h.id DESC
-        LIMIT 10
-        """
-    ).fetchall()
-
-    return {
-        "total_docs": total_docs,
-        "active_users": active_users,
-        "documents_with_files": documents_with_files,
-        "completed_docs": completed_docs,
-        "open_docs": open_docs,
-        "average_open_age": average_open_age,
-        "updates_last_7_days": updates_last_7_days,
-        "status_breakdown": status_breakdown,
-        "category_breakdown": category_breakdown,
-        "holder_breakdown": holder_breakdown,
-        "daily_activity": daily_activity,
-        "recent_activity": recent_activity,
-    }
 
 
 def login_required(view_func):
@@ -580,26 +443,24 @@ def documents():
     return redirect(url_for("dashboard", search=search))
 
 
-@app.route("/analytics")
-@login_required
-def analytics():
-    return redirect(url_for("dashboard"))
-
-
 @app.route("/documents/add", methods=["GET", "POST"])
 @login_required
 def add_document():
     if request.method == "POST":
         conn = get_db()
-        doc_no = request.form.get("doc_no", "").strip()
+        doc_no = generate_document_number(conn)
         title = request.form.get("title", "").strip()
         description = request.form.get("description", "").strip()
         category = request.form.get("category", "").strip()
-        current_status = request.form.get("current_status", "").strip()
+        current_status = request.form.get("current_status", "On Process").strip()
         holder_user_id = request.form.get("holder_user_id") or None
 
-        if not doc_no or not title:
-            flash("Document number and title are required.", "danger")
+        if not title:
+            flash("Document title is required.", "danger")
+            return redirect(url_for("dashboard", open_modal="add-document"))
+
+        if category not in app.config["CATEGORY_CHOICES"]:
+            flash("Please select a valid document category.", "danger")
             return redirect(url_for("dashboard", open_modal="add-document"))
 
         if current_status not in app.config["STATUS_CHOICES"]:
@@ -638,7 +499,7 @@ def add_document():
                     doc_no,
                     title,
                     description or None,
-                    category or None,
+                    category,
                     current_status,
                     holder_user_id,
                     saved_name,
@@ -687,7 +548,7 @@ def add_document():
                 if uploaded_path.exists():
                     uploaded_path.unlink()
             conn.rollback()
-            flash("Document number already exists. Please use a unique document number.", "danger")
+            flash("A generated document number conflicted. Please try saving again.", "danger")
             return redirect(url_for("dashboard", open_modal="add-document"))
         except sqlite3.OperationalError as exc:
             if saved_name:
@@ -703,7 +564,12 @@ def add_document():
             flash("The document file could not be saved. Please try again.", "danger")
             return redirect(url_for("dashboard", open_modal="add-document"))
 
-    return render_template("add_document.html", users=get_active_users(), status_choices=app.config["STATUS_CHOICES"])
+    return render_template(
+        "add_document.html",
+        users=get_active_users(),
+        status_choices=app.config["STATUS_CHOICES"],
+        category_choices=app.config["CATEGORY_CHOICES"],
+    )
 
 
 @app.route("/documents/edit/<int:id>", methods=["GET", "POST"])
@@ -717,31 +583,44 @@ def edit_document(id):
         return redirect(url_for("dashboard"))
 
     if request.method == "POST":
-        doc_no = request.form.get("doc_no", "").strip()
         title = request.form.get("title", "").strip()
         description = request.form.get("description", "").strip()
         category = request.form.get("category", "").strip()
         holder_user_id = request.form.get("holder_user_id") or None
 
-        if not doc_no or not title:
-            flash("Document number and title are required.", "danger")
-            return render_template("edit_document.html", document=document, users=get_active_users(conn))
+        if not title:
+            flash("Document title is required.", "danger")
+            return render_template(
+                "edit_document.html",
+                document=document,
+                users=get_active_users(conn),
+                category_choices=app.config["CATEGORY_CHOICES"],
+            )
+
+        if category not in app.config["CATEGORY_CHOICES"]:
+            flash("Please select a valid document category.", "danger")
+            return render_template(
+                "edit_document.html",
+                document=document,
+                users=get_active_users(conn),
+                category_choices=app.config["CATEGORY_CHOICES"],
+            )
 
         try:
             conn.execute(
                 """
                 UPDATE documents
-                SET doc_no = ?, title = ?, description = ?, category = ?, holder_user_id = ?, updated_at = CURRENT_TIMESTAMP
+                SET title = ?, description = ?, category = ?, holder_user_id = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
                 """,
-                (doc_no, title, description or None, category or None, holder_user_id, id),
+                (title, description or None, category, holder_user_id, id),
             )
             log_audit(
                 "edit document",
                 "document",
                 id,
                 {
-                    "doc_no": doc_no,
+                    "doc_no": document["doc_no"],
                     "title": title,
                     "holder_user_id": holder_user_id,
                 },
@@ -762,7 +641,12 @@ def edit_document(id):
 
         document = conn.execute("SELECT * FROM documents WHERE id = ?", (id,)).fetchone()
 
-    return render_template("edit_document.html", document=document, users=get_active_users(conn))
+    return render_template(
+        "edit_document.html",
+        document=document,
+        users=get_active_users(conn),
+        category_choices=app.config["CATEGORY_CHOICES"],
+    )
 
 
 @app.route("/documents/update_status/<int:id>", methods=["POST"])
