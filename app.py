@@ -295,6 +295,47 @@ def get_document_listing_data(search="", open_modal=""):
     return listing_data
 
 
+def get_category_analytics(category):
+    conn = get_db()
+    if category not in app.config["CATEGORY_CHOICES"]:
+        category = app.config["CATEGORY_CHOICES"][0]
+
+    stats = conn.execute(
+        """
+        SELECT
+            COUNT(*) AS total,
+            SUM(CASE WHEN current_status = 'On Process' THEN 1 ELSE 0 END) AS on_process,
+            SUM(CASE WHEN current_status = 'Settled' THEN 1 ELSE 0 END) AS settled,
+            SUM(CASE WHEN file_name IS NOT NULL AND file_name != '' THEN 1 ELSE 0 END) AS with_files
+        FROM documents
+        WHERE category = ?
+        """,
+        (category,),
+    ).fetchone()
+    recent_docs = conn.execute(
+        """
+        SELECT doc_no, title, current_status, updated_at
+        FROM documents
+        WHERE category = ?
+        ORDER BY updated_at DESC, id DESC
+        LIMIT 5
+        """,
+        (category,),
+    ).fetchall()
+
+    total = stats["total"] or 0
+    settled = stats["settled"] or 0
+    return {
+        "selected_category": category,
+        "category_total": total,
+        "category_on_process": stats["on_process"] or 0,
+        "category_settled": settled,
+        "category_with_files": stats["with_files"] or 0,
+        "category_settled_percent": round((settled / total) * 100, 1) if total else 0,
+        "category_recent_docs": recent_docs,
+    }
+
+
 def login_required(view_func):
     @wraps(view_func)
     def wrapped_view(*args, **kwargs):
@@ -342,7 +383,10 @@ def handle_large_file(error):
 def dashboard():
     search = request.args.get("search", "").strip()
     open_modal = request.args.get("open_modal", "").strip()
-    return render_template("dashboard.html", **get_document_listing_data(search, open_modal))
+    selected_category = request.args.get("analytics_category", app.config["CATEGORY_CHOICES"][0]).strip()
+    page_data = get_document_listing_data(search, open_modal)
+    page_data.update(get_category_analytics(selected_category))
+    return render_template("dashboard.html", **page_data)
 
 
 @app.route("/login", methods=["GET", "POST"])

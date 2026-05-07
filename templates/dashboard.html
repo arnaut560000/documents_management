@@ -1,5 +1,73 @@
 {% extends 'base.html' %}
 {% block content %}
+<div class="glass-panel category-analytics mb-4">
+    <div class="panel-header">
+        <div>
+            <span class="eyebrow">Category Analytics</span>
+            <h3 class="panel-title">{{ selected_category }}</h3>
+        </div>
+        <div class="category-button-group">
+            {% for category in category_choices %}
+            <a href="{{ url_for('dashboard', analytics_category=category, search=search) }}"
+               class="category-button {% if selected_category == category %}active{% endif %}">
+                {{ category }}
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="analytics-summary">
+        <div>
+            <span>Total</span>
+            <strong>{{ category_total }}</strong>
+        </div>
+        <div>
+            <span>On Process</span>
+            <strong>{{ category_on_process }}</strong>
+        </div>
+        <div>
+            <span>Settled</span>
+            <strong>{{ category_settled }}</strong>
+        </div>
+        <div>
+            <span>With Files</span>
+            <strong>{{ category_with_files }}</strong>
+        </div>
+    </div>
+
+    <div class="category-progress mt-3">
+        <div>
+            <span>Settled Rate</span>
+            <strong>{{ category_settled_percent }}%</strong>
+        </div>
+        <div class="category-progress-track">
+            <span style="width: {{ category_settled_percent }}%;"></span>
+        </div>
+    </div>
+
+    <div class="category-recent mt-4">
+        <div class="chart-head">
+            <div>
+                <span class="chart-kicker">Latest Records</span>
+                <h4>{{ selected_category }}</h4>
+            </div>
+        </div>
+        <div class="category-recent-list">
+            {% for doc in category_recent_docs %}
+            <div class="category-recent-item">
+                <div>
+                    <strong>{{ doc.title }}</strong>
+                    <span>{{ doc.doc_no }} · Updated {{ doc.updated_at }}</span>
+                </div>
+                <span class="status-chip">{{ doc.current_status }}</span>
+            </div>
+            {% else %}
+            <div class="empty-history">No documents found for this category yet.</div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
 <div class="row g-4 mb-4">
     <div class="col-md-6 col-xl-4">
         <div class="metric-card metric-card-primary">
@@ -34,6 +102,7 @@
     </div>
 
     <form method="GET" action="{{ url_for('dashboard') }}" class="row g-3">
+        <input type="hidden" name="analytics_category" value="{{ selected_category }}">
         <div class="col-lg-9">
             <input type="text" name="search" value="{{ search }}" class="form-control modern-input" placeholder="Search by document number, title, category, or status">
         </div>
