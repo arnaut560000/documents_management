@@ -1,0 +1,8 @@
+instance/ export-ignore
+logs/ export-ignore
+uploads/ export-ignore
+*.db export-ignore
+*.sqlite export-ignore
+*.sqlite3 export-ignore
+*.log export-ignore
+.env export-ignore
