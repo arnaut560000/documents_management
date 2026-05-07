@@ -2,6 +2,7 @@ import json
 import os
 import secrets
 import sqlite3
+import tempfile
 import uuid
 from pathlib import Path
 from functools import wraps
@@ -28,20 +29,25 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent
 INSTANCE_DIR = BASE_DIR / "instance"
+IS_VERCEL = bool(os.getenv("VERCEL"))
+VERCEL_TMP_DIR = Path(tempfile.gettempdir())
+DEFAULT_DATABASE_PATH = VERCEL_TMP_DIR / "neeco_dms.db" if IS_VERCEL else INSTANCE_DIR / "neeco_dms.db"
+DEFAULT_UPLOAD_FOLDER = VERCEL_TMP_DIR / "uploads" if IS_VERCEL else BASE_DIR / "uploads"
 
 
-def _resolve_path(value, fallback):
+def _resolve_path(value, fallback, base_dir=BASE_DIR):
     raw_value = value or str(fallback)
     path = Path(raw_value)
     if not path.is_absolute():
-        path = BASE_DIR / path
+        path = base_dir / path
     return path
 
 
 class Config:
     SECRET_KEY = os.getenv("SECRET_KEY") or secrets.token_hex(32)
-    DATABASE = str(_resolve_path(os.getenv("DATABASE_PATH"), INSTANCE_DIR / "neeco_dms.db"))
-    UPLOAD_FOLDER = str(_resolve_path(os.getenv("UPLOAD_FOLDER"), BASE_DIR / "uploads"))
+    WRITABLE_BASE_DIR = VERCEL_TMP_DIR if IS_VERCEL else BASE_DIR
+    DATABASE = str(_resolve_path(os.getenv("DATABASE_PATH"), DEFAULT_DATABASE_PATH, WRITABLE_BASE_DIR))
+    UPLOAD_FOLDER = str(_resolve_path(os.getenv("UPLOAD_FOLDER"), DEFAULT_UPLOAD_FOLDER, WRITABLE_BASE_DIR))
     MAX_CONTENT_LENGTH = int(os.getenv("MAX_CONTENT_LENGTH", 16 * 1024 * 1024))
     SQLITE_TIMEOUT = float(os.getenv("SQLITE_TIMEOUT", "10"))
     SQLITE_BUSY_TIMEOUT_MS = int(os.getenv("SQLITE_BUSY_TIMEOUT_MS", "10000"))
