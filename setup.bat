@@ -83,4 +83,4 @@ echo 1. Review the .env file if you want to change the port or admin account.
 echo 2. Double-click start_server.bat to test the server.
 echo 3. If it works, run register_startup_task.bat as Administrator for auto-start.
 echo.
-pause
+if not "%NEECO_SETUP_NO_PAUSE%"=="1" pause
