@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="page-heading mb-4">
+    <div>
+        <span class="eyebrow">User Management</span>
+        <h1 class="section-title">Manage office accounts</h1>
+        <p class="section-copy">Admin and staff roles stay the same, inactive users stay in the system, and newly created or reset accounts must change passwords on first login.</p>
+    </div>
+    <a href="{{ url_for('add_user') }}" class="btn btn-primary-soft">Add User</a>
+</div>
+
+<div class="glass-panel">
+    <div class="table-responsive modern-table-wrap">
+        <table class="table modern-table align-middle">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Full Name</th>
+                    <th>Username</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Password</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr>
+                    <td>{{ user.id }}</td>
+                    <td>{{ user.full_name }}</td>
+                    <td>{{ user.username }}</td>
+                    <td>{{ user.role|title }}</td>
+                    <td>{{ 'Active' if user.is_active else 'Inactive' }}</td>
+                    <td>{{ 'Must change on next login' if user.must_change_password else 'OK' }}</td>
+                    <td>
+                        <a href="{{ url_for('edit_user', id=user.id) }}" class="btn btn-sm btn-outline-modern">Edit</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

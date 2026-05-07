@@ -1,0 +1,320 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="hero-panel hero-panel-compact mb-4">
+    <div>
+        <span class="eyebrow">Document Workspace</span>
+        <h1 class="hero-title">Track every file with less friction.</h1>
+        <p class="hero-copy">Add records from a popup, update ownership quickly, and open a cleaner status trail whenever you need the full story.</p>
+    </div>
+    <div class="hero-meta">
+        <button type="button" class="btn btn-primary-soft" data-bs-toggle="modal" data-bs-target="#addDocumentModal">Add Document</button>
+        <a href="{{ url_for('add_document') }}" class="btn btn-outline-modern">Open Full Form</a>
+    </div>
+</section>
+
+<div class="glass-panel mb-4">
+    <div class="panel-header">
+        <div>
+            <span class="eyebrow">Search & Filter</span>
+            <h3 class="panel-title">Find a document fast</h3>
+        </div>
+    </div>
+
+    <form method="GET" class="row g-3">
+        <div class="col-lg-9">
+            <input type="text" name="search" value="{{ search }}" class="form-control modern-input" placeholder="Search by document number, title, category, or status">
+        </div>
+        <div class="col-sm-6 col-lg-2">
+            <button class="btn btn-dark-soft w-100">Search</button>
+        </div>
+        <div class="col-sm-6 col-lg-1">
+            <a href="{{ url_for('documents') }}" class="btn btn-outline-modern w-100">Reset</a>
+        </div>
+    </form>
+</div>
+
+<div class="glass-panel">
+    <div class="panel-header">
+        <div>
+            <span class="eyebrow">Live Registry</span>
+            <h3 class="panel-title">All documents</h3>
+        </div>
+        <div class="results-pill">{{ docs|length }} item{{ '' if docs|length == 1 else 's' }}</div>
+    </div>
+
+    <div class="table-responsive modern-table-wrap">
+        <table class="table modern-table align-middle">
+            <thead>
+                <tr>
+                    <th>Doc No</th>
+                    <th>Title</th>
+                    <th>Category</th>
+                    <th>Status</th>
+                    <th>Holder</th>
+                    <th>Uploaded By</th>
+                    <th>File</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for doc in docs %}
+                <tr>
+                    <td><div class="doc-id">{{ doc.doc_no }}</div></td>
+                    <td>
+                        <div class="doc-title">{{ doc.title }}</div>
+                        <div class="doc-meta">Created {{ doc.created_at }}</div>
+                    </td>
+                    <td>{{ doc.category or '-' }}</td>
+                    <td>
+                        <button class="status-chip status-btn"
+                            data-id="{{ doc.id }}"
+                            data-status="{{ doc.current_status }}"
+                            data-holder="{{ doc.holder_user_id or '' }}"
+                            data-title="{{ doc.title }}">
+                            {{ doc.current_status }}
+                        </button>
+                    </td>
+                    <td>{{ doc.holder_name or 'Not Assigned' }}</td>
+                    <td>{{ doc.uploaded_by_name }}</td>
+                    <td>
+                        {% if doc.file_name %}
+                            <a href="{{ url_for('download_file', filename=doc.file_name) }}" class="btn btn-sm btn-outline-modern">Download</a>
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td class="action-group-cell">
+                        <div class="action-group">
+                            <a href="{{ url_for('edit_document', id=doc.id) }}" class="btn btn-sm btn-outline-modern">Edit</a>
+                            <button class="btn btn-sm btn-dark-soft history-btn" data-id="{{ doc.id }}" data-title="{{ doc.title }}">See Status</button>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="8" class="text-center empty-state-cell">No documents found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="modal fade" id="addDocumentModal" tabindex="-1">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content modern-modal">
+      <div class="modal-header border-0">
+        <div>
+            <span class="eyebrow">Quick Add</span>
+            <h5 class="modal-title">Add a document</h5>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="{{ url_for('add_document') }}" enctype="multipart/form-data">
+        <div class="modal-body pt-0">
+            <div class="row g-4">
+                <div class="col-md-6">
+                    <label class="form-label">Document No</label>
+                    <input type="text" name="doc_no" class="form-control modern-input" required>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Title</label>
+                    <input type="text" name="title" class="form-control modern-input" required>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Category</label>
+                    <input type="text" name="category" class="form-control modern-input">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Initial Status</label>
+                    <select name="current_status" class="form-select modern-input" required>
+                        <option value="Pending">Pending</option>
+                        <option value="On Process">On Process</option>
+                        <option value="Approved">Approved</option>
+                        <option value="Released">Released</option>
+                        <option value="Returned">Returned</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Who Has the Document?</label>
+                    <select name="holder_user_id" class="form-select modern-input">
+                        <option value="">-- Not Assigned --</option>
+                        {% for user in users %}
+                        <option value="{{ user.id }}">{{ user.full_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">File</label>
+                    <input type="file" name="file" class="form-control modern-input">
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Description</label>
+                    <textarea name="description" class="form-control modern-input" rows="4"></textarea>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer border-0">
+          <button type="button" class="btn btn-outline-modern" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary-soft">Save Document</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="statusModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content modern-modal">
+      <div class="modal-header border-0">
+        <div>
+            <span class="eyebrow">Status Update</span>
+            <h5 class="modal-title">Update document workflow</h5>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="statusForm">
+        <div class="modal-body pt-0">
+            <input type="hidden" id="document_id">
+            <div class="mb-3">
+                <label class="form-label">Document</label>
+                <input type="text" id="document_title" class="form-control modern-input" readonly>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">New Status</label>
+                <select id="new_status" class="form-select modern-input" required>
+                    <option value="Pending">Pending</option>
+                    <option value="On Process">On Process</option>
+                    <option value="Approved">Approved</option>
+                    <option value="Released">Released</option>
+                    <option value="Returned">Returned</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Who Has the Document?</label>
+                <select id="holder_user_id" class="form-select modern-input">
+                    <option value="">-- Not Assigned --</option>
+                    {% for user in users %}
+                    <option value="{{ user.id }}">{{ user.full_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Remarks</label>
+                <textarea id="remarks" class="form-control modern-input" rows="3" placeholder="Add a note about what changed"></textarea>
+            </div>
+        </div>
+        <div class="modal-footer border-0">
+          <button type="button" class="btn btn-outline-modern" data-bs-dismiss="modal">Close</button>
+          <button type="submit" class="btn btn-primary-soft">Save Update</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="historyModal" tabindex="-1">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content modern-modal">
+      <div class="modal-header border-0">
+        <div>
+            <span class="eyebrow">Activity Trail</span>
+            <h5 class="modal-title">Document status history</h5>
+            <p class="modal-subtitle mb-0" id="historySubtitle">Everything that happened to this document.</p>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body pt-0" id="historyContent">
+        Loading...
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const statusModal = new bootstrap.Modal(document.getElementById('statusModal'));
+const historyModal = new bootstrap.Modal(document.getElementById('historyModal'));
+
+document.querySelectorAll('.status-btn').forEach(btn => {
+    btn.addEventListener('click', function () {
+        document.getElementById('document_id').value = this.dataset.id;
+        document.getElementById('document_title').value = this.dataset.title;
+        document.getElementById('new_status').value = this.dataset.status;
+        document.getElementById('holder_user_id').value = this.dataset.holder;
+        document.getElementById('remarks').value = '';
+        statusModal.show();
+    });
+});
+
+document.getElementById('statusForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const id = document.getElementById('document_id').value;
+    const formData = new FormData();
+    formData.append('new_status', document.getElementById('new_status').value);
+    formData.append('holder_user_id', document.getElementById('holder_user_id').value);
+    formData.append('remarks', document.getElementById('remarks').value);
+
+    const response = await fetch(`/documents/update_status/${id}`, {
+        method: 'POST',
+        body: formData
+    });
+
+    const data = await response.json();
+    alert(data.message);
+    if (data.success) {
+        location.reload();
+    }
+});
+
+document.querySelectorAll('.history-btn').forEach(btn => {
+    btn.addEventListener('click', async function() {
+        const id = this.dataset.id;
+        const title = this.dataset.title;
+        document.getElementById('historySubtitle').textContent = `Everything that happened to "${title}".`;
+        const response = await fetch(`/documents/history/${id}`);
+        const data = await response.json();
+
+        if (data.length === 0) {
+            document.getElementById('historyContent').innerHTML = '<div class="empty-history">No status history found for this document yet.</div>';
+        } else {
+            const html = data.map((item, index) => `
+                <div class="timeline-entry">
+                    <div class="timeline-dot"></div>
+                    <div class="timeline-card">
+                        <div class="timeline-head">
+                            <div>
+                                <span class="timeline-step">Update ${data.length - index}</span>
+                                <h6>${item.new_status}</h6>
+                            </div>
+                            <span class="timeline-date">${item.updated_at}</span>
+                        </div>
+                        <div class="timeline-grid">
+                            <div>
+                                <span class="timeline-label">Previous Status</span>
+                                <strong>${item.old_status || 'Initial entry'}</strong>
+                            </div>
+                            <div>
+                                <span class="timeline-label">Current Holder</span>
+                                <strong>${item.holder_name}</strong>
+                            </div>
+                            <div>
+                                <span class="timeline-label">Updated By</span>
+                                <strong>${item.updated_by_name}</strong>
+                            </div>
+                            <div>
+                                <span class="timeline-label">Remarks</span>
+                                <strong>${item.remarks || 'No remarks added'}</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            document.getElementById('historyContent').innerHTML = `<div class="timeline">${html}</div>`;
+        }
+
+        historyModal.show();
+    });
+});
+</script>
+{% endblock %}
