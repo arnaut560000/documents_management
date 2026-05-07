@@ -190,7 +190,19 @@ def initialize_database():
                     app.config["DEFAULT_ADMIN_USERNAME"],
                     generate_password_hash(app.config["DEFAULT_ADMIN_PASSWORD"]),
                     "admin",
-                    1,
+                    0 if IS_VERCEL else 1,
+                ),
+            )
+        elif IS_VERCEL:
+            conn.execute(
+                """
+                UPDATE users
+                SET password = ?, role = 'admin', is_active = 1, must_change_password = 0
+                WHERE username = ?
+                """,
+                (
+                    generate_password_hash(app.config["DEFAULT_ADMIN_PASSWORD"]),
+                    app.config["DEFAULT_ADMIN_USERNAME"],
                 ),
             )
 
