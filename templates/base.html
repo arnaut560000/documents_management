@@ -135,11 +135,30 @@ const notificationViewBtn = document.getElementById('notificationViewBtn');
 let activeNotification = null;
 let notificationVisible = false;
 
+async function loadNotificationUsers(selectedUserId) {
+    const select = document.getElementById('notificationForwardedTo');
+    if (!select || select.dataset.loaded === '1') return;
+    try {
+        const response = await fetch('{{ url_for("active_users_json") }}', { cache: 'no-store' });
+        if (!response.ok) return;
+        const users = await response.json();
+        users.forEach(user => {
+            const option = document.createElement('option');
+            option.value = user.id;
+            option.textContent = user.full_name;
+            select.appendChild(option);
+        });
+        select.dataset.loaded = '1';
+        if (selectedUserId) select.value = selectedUserId;
+    } catch (error) {
+        console.warn('User list could not be loaded.', error);
+    }
+}
 async function markNotificationSeen(notificationId) {
     await fetch(`/notifications/${notificationId}/seen`, { method: 'POST' });
 }
 
-function showDocumentNotification(item) {
+async function showDocumentNotification(item) {
     if (!notificationModal || notificationVisible) return;
     activeNotification = item;
     notificationVisible = true;
@@ -147,6 +166,7 @@ function showDocumentNotification(item) {
     document.getElementById('notificationDocTitle').textContent = item.title;
     document.getElementById('notificationDocMeta').textContent = `${item.category || 'Uncategorized'} - ${item.current_status} - Forwarded by ${item.assigned_by_name} - ${item.created_at}`;
     document.getElementById('notificationStatus').value = item.current_status;
+    await loadNotificationUsers(item.holder_user_id || '{{ session.get('user_id') }}');
     document.getElementById('notificationForwardedTo').value = item.holder_user_id || '{{ session.get('user_id') }}';
     document.getElementById('notificationActionTaken').value = '';
     notificationModal.show();

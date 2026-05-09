@@ -5,7 +5,7 @@
         <div>
             <span class="eyebrow">Live Analytics</span>
             <h3 class="panel-title">{{ selected_category }}</h3>
-            <p class="section-copy mb-0">Active work stays visible first. Settled records are kept in their own view for cleaner daily tracking.</p>
+            <p class="section-copy mb-0">These analytics are only for the selected category. Overall system totals are shown below.</p>
         </div>
         <div class="category-button-group">
             {% for category in category_choices %}
@@ -20,19 +20,19 @@
     <div class="analytics-summary analytics-summary-live">
         <div>
             <span>Total</span>
-            <strong data-live-count="total">{{ total_docs }}</strong>
+            <strong data-category-count="total">{{ category_total }}</strong>
         </div>
         <div>
             <span>On Process</span>
-            <strong data-live-count="active">{{ process_docs }}</strong>
+            <strong data-category-count="active">{{ category_on_process }}</strong>
         </div>
         <div>
             <span>Settled</span>
-            <strong data-live-count="settled">{{ settled_docs }}</strong>
+            <strong data-category-count="settled">{{ category_settled }}</strong>
         </div>
         <div>
             <span>With Files</span>
-            <strong>{{ category_with_files }}</strong>
+            <strong data-category-count="with_files">{{ category_with_files }}</strong>
         </div>
     </div>
 
@@ -367,12 +367,18 @@ document.querySelectorAll('.history-btn').forEach(btn => {
 
 async function refreshLiveCounts() {
     try {
-        const response = await fetch('{{ url_for("dashboard_counts") }}', { cache: 'no-store' });
+        const response = await fetch('{{ url_for("dashboard_counts", category=selected_category) }}', { cache: 'no-store' });
         if (!response.ok) return;
         const counts = await response.json();
         document.querySelectorAll('[data-live-count="total"]').forEach(el => el.textContent = counts.total);
         document.querySelectorAll('[data-live-count="active"]').forEach(el => el.textContent = counts.active);
         document.querySelectorAll('[data-live-count="settled"]').forEach(el => el.textContent = counts.settled);
+        if (counts.category) {
+            document.querySelectorAll('[data-category-count="total"]').forEach(el => el.textContent = counts.category.total);
+            document.querySelectorAll('[data-category-count="active"]').forEach(el => el.textContent = counts.category.active);
+            document.querySelectorAll('[data-category-count="settled"]').forEach(el => el.textContent = counts.category.settled);
+            document.querySelectorAll('[data-category-count="with_files"]').forEach(el => el.textContent = counts.category.with_files);
+        }
         document.getElementById('liveSyncTime').textContent = counts.server_time;
         const changed = counts.total !== liveCountsSnapshot.total || counts.active !== liveCountsSnapshot.active || counts.settled !== liveCountsSnapshot.settled;
         liveCountsSnapshot = counts;

@@ -547,6 +547,7 @@ def _document_details(id):
 
 def _dashboard_counts():
     conn = core.get_db()
+    category = request.args.get("category", "").strip()
     row = conn.execute(
         """
         SELECT COUNT(*) AS total,
@@ -555,12 +556,39 @@ def _dashboard_counts():
         FROM documents
         """
     ).fetchone()
+    category_counts = None
+    if category in core.app.config["CATEGORY_CHOICES"]:
+        category_row = conn.execute(
+            """
+            SELECT COUNT(*) AS total,
+                   SUM(CASE WHEN current_status = 'On Process' THEN 1 ELSE 0 END) AS active,
+                   SUM(CASE WHEN current_status = 'Settled' THEN 1 ELSE 0 END) AS settled,
+                   SUM(CASE WHEN file_name IS NOT NULL AND file_name != '' THEN 1 ELSE 0 END) AS with_files
+            FROM documents
+            WHERE category = ?
+            """,
+            (category,),
+        ).fetchone()
+        category_counts = {
+            "total": category_row["total"] or 0,
+            "active": category_row["active"] or 0,
+            "settled": category_row["settled"] or 0,
+            "with_files": category_row["with_files"] or 0,
+        }
     return jsonify({
         "total": row["total"] or 0,
         "active": row["active"] or 0,
         "settled": row["settled"] or 0,
+        "category": category_counts,
         "server_time": _format_ph_time(datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")),
     })
+
+
+def _active_users_json():
+    return jsonify([
+        {"id": row["id"], "full_name": row["full_name"]}
+        for row in core.get_active_users()
+    ])
 
 
 def _mark_notification_seen(notification_id):
@@ -636,3 +664,5 @@ def apply(app):
         app.add_url_rule("/documents/details/<int:id>", "document_details", core.login_required(_document_details))
     if "dashboard_counts" not in app.view_functions:
         app.add_url_rule("/dashboard/counts", "dashboard_counts", core.login_required(_dashboard_counts))
+    if "active_users_json" not in app.view_functions:
+        app.add_url_rule("/users/active-json", "active_users_json", core.login_required(_active_users_json))
