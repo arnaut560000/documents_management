@@ -1,14 +1,15 @@
 ﻿{% extends 'base.html' %}
 {% block content %}
 <div class="glass-panel category-analytics mb-4">
-    <div class="panel-header">
+    <div class="panel-header analytics-topline">
         <div>
-            <span class="eyebrow">Category Analytics</span>
+            <span class="eyebrow">Live Analytics</span>
             <h3 class="panel-title">{{ selected_category }}</h3>
+            <p class="section-copy mb-0">Active work stays visible first. Settled records are kept in their own view for cleaner daily tracking.</p>
         </div>
         <div class="category-button-group">
             {% for category in category_choices %}
-            <a href="{{ url_for('dashboard', analytics_category=category, search=search) }}"
+            <a href="{{ url_for('dashboard', analytics_category=category, search=search, status_view=status_view) }}"
                class="category-button {% if selected_category == category %}active{% endif %}">
                 {{ category }}
             </a>
@@ -16,18 +17,18 @@
         </div>
     </div>
 
-    <div class="analytics-summary">
+    <div class="analytics-summary analytics-summary-live">
         <div>
             <span>Total</span>
-            <strong>{{ category_total }}</strong>
+            <strong data-live-count="total">{{ total_docs }}</strong>
         </div>
         <div>
             <span>On Process</span>
-            <strong>{{ category_on_process }}</strong>
+            <strong data-live-count="active">{{ process_docs }}</strong>
         </div>
         <div>
             <span>Settled</span>
-            <strong>{{ category_settled }}</strong>
+            <strong data-live-count="settled">{{ settled_docs }}</strong>
         </div>
         <div>
             <span>With Files</span>
@@ -35,35 +36,39 @@
         </div>
     </div>
 
-    <div class="category-progress mt-3">
-        <div>
-            <span>Settled Rate</span>
-            <strong>{{ category_settled_percent }}%</strong>
-        </div>
-        <div class="category-progress-track">
-            <span style="width: {{ category_settled_percent }}%;"></span>
-        </div>
-    </div>
-
-    <div class="category-recent mt-4">
-        <div class="chart-head">
-            <div>
-                <span class="chart-kicker">Latest Records</span>
-                <h4>{{ selected_category }}</h4>
-            </div>
-        </div>
-        <div class="category-recent-list">
-            {% for doc in category_recent_docs %}
-            <div class="category-recent-item">
+    <div class="analytics-grid-tight mt-3">
+        <div class="analytics-focus-card">
+            <span class="chart-kicker">Category Workload</span>
+            <div class="category-progress mt-2">
                 <div>
-                    <strong>{{ doc.title }}</strong>
-                    <span>{{ doc.doc_no }} Â· Updated {{ doc.updated_at }}</span>
+                    <span>On Process Rate</span>
+                    <strong>{{ category_active_percent }}%</strong>
                 </div>
-                <span class="status-chip">{{ doc.current_status }}</span>
+                <div class="category-progress-track"><span style="width: {{ category_active_percent }}%;"></span></div>
             </div>
-            {% else %}
-            <div class="empty-history">No documents found for this category yet.</div>
-            {% endfor %}
+            <div class="category-progress mt-3">
+                <div>
+                    <span>Settled Rate</span>
+                    <strong>{{ category_settled_percent }}%</strong>
+                </div>
+                <div class="category-progress-track settled-track"><span style="width: {{ category_settled_percent }}%;"></span></div>
+            </div>
+        </div>
+        <div class="analytics-focus-card">
+            <span class="chart-kicker">Active Latest Records</span>
+            <div class="category-recent-list mt-2">
+                {% for doc in category_recent_docs %}
+                <div class="category-recent-item compact-recent-item">
+                    <div>
+                        <strong>{{ doc.title }}</strong>
+                        <span>{{ doc.doc_no }} - Updated {{ doc.updated_at|ph_time }}</span>
+                    </div>
+                    <span class="status-chip">{{ doc.current_status }}</span>
+                </div>
+                {% else %}
+                <div class="empty-history">No active documents found for this category.</div>
+                {% endfor %}
+            </div>
         </div>
     </div>
 </div>
@@ -72,22 +77,22 @@
     <div class="col-md-6 col-xl-4">
         <div class="metric-card metric-card-primary">
             <span class="metric-label">Total Documents</span>
-            <h2>{{ total_docs }}</h2>
-            <p>Everything currently tracked in the system.</p>
+            <h2 data-live-count="total">{{ total_docs }}</h2>
+            <p>All records saved in the system.</p>
         </div>
     </div>
     <div class="col-md-6 col-xl-4">
         <div class="metric-card">
             <span class="metric-label">On Process</span>
-            <h2>{{ process_docs }}</h2>
-            <p>Actively moving between handlers.</p>
+            <h2 data-live-count="active">{{ process_docs }}</h2>
+            <p>Current documents still moving between users.</p>
         </div>
     </div>
     <div class="col-md-6 col-xl-4">
         <div class="metric-card">
             <span class="metric-label">Settled</span>
-            <h2>{{ settled_docs }}</h2>
-            <p>Completed records ready for reference or archive.</p>
+            <h2 data-live-count="settled">{{ settled_docs }}</h2>
+            <p>Completed records available through the settled view.</p>
         </div>
     </div>
 </div>
@@ -103,6 +108,7 @@
 
     <form method="GET" action="{{ url_for('dashboard') }}" class="row g-3">
         <input type="hidden" name="analytics_category" value="{{ selected_category }}">
+        <input type="hidden" name="status_view" value="{{ status_view }}">
         <div class="col-lg-9">
             <input type="text" name="search" value="{{ search }}" class="form-control modern-input" placeholder="Search by document number, title, category, or status">
         </div>
@@ -110,18 +116,24 @@
             <button class="btn btn-dark-soft w-100">Search</button>
         </div>
         <div class="col-sm-6 col-lg-1">
-            <a href="{{ url_for('dashboard') }}" class="btn btn-outline-modern w-100">Reset</a>
+            <a href="{{ url_for('dashboard', status_view=status_view) }}" class="btn btn-outline-modern w-100">Reset</a>
         </div>
     </form>
 </div>
 
 <div class="glass-panel">
-    <div class="panel-header">
+    <div class="panel-header registry-header">
         <div>
             <span class="eyebrow">Document Registry</span>
-            <h3 class="panel-title">All tracked documents</h3>
+            <h3 class="panel-title">{% if status_view == 'settled' %}Settled documents{% elif status_view == 'all' %}All documents{% else %}Active documents{% endif %}</h3>
+            <p class="section-copy mb-0">Last synced <span id="liveSyncTime">just now</span>.</p>
         </div>
-        <div class="results-pill">{{ docs|length }} item{{ '' if docs|length == 1 else 's' }}</div>
+        <div class="registry-actions">
+            <a href="{{ url_for('dashboard', status_view='active', analytics_category=selected_category, search=search) }}" class="btn btn-sm {% if status_view == 'active' %}btn-dark-soft{% else %}btn-outline-modern{% endif %}">Active</a>
+            <a href="{{ url_for('dashboard', status_view='settled', analytics_category=selected_category, search=search) }}" class="btn btn-sm {% if status_view == 'settled' %}btn-dark-soft{% else %}btn-outline-modern{% endif %}">View Settled Documents</a>
+            <a href="{{ url_for('dashboard', status_view='all', analytics_category=selected_category, search=search) }}" class="btn btn-sm {% if status_view == 'all' %}btn-dark-soft{% else %}btn-outline-modern{% endif %}">All</a>
+            <div class="results-pill">{{ docs|length }} item{{ '' if docs|length == 1 else 's' }}</div>
+        </div>
     </div>
 
     <div class="table-responsive modern-table-wrap">
@@ -132,7 +144,7 @@
                     <th>Title</th>
                     <th>Category</th>
                     <th>Status</th>
-                    <th>Holder</th>
+                    <th>Forwarded To</th>
                     <th>Uploaded By</th>
                     <th>File</th>
                     <th>Actions</th>
@@ -140,14 +152,12 @@
             </thead>
             <tbody>
                 {% for doc in docs %}
-                <tr>
+                <tr data-document-row="{{ doc.id }}">
                     <td><div class="doc-id">{{ doc.doc_no }}</div></td>
                     <td>
                         <div class="doc-title">{{ doc.title }}</div>
-                        <div class="doc-meta">Created {{ doc.created_at }}</div>
-                        {% if doc.original_file_name %}
-                        <div class="doc-meta">Original file: {{ doc.original_file_name }}</div>
-                        {% endif %}
+                        <div class="doc-meta">Created {{ doc.created_at|ph_time }}</div>
+                        {% if doc.original_file_name %}<div class="doc-meta">Original file: {{ doc.original_file_name }}</div>{% endif %}
                     </td>
                     <td>{{ doc.category or '-' }}</td>
                     <td>
@@ -170,6 +180,7 @@
                     </td>
                     <td class="action-group-cell">
                         <div class="action-group">
+                            <button class="btn btn-sm btn-outline-modern view-doc-btn" data-id="{{ doc.id }}">View</button>
                             {% if doc.uploaded_by == session.get('user_id') %}
                             <a href="{{ url_for('edit_document', id=doc.id) }}" class="btn btn-sm btn-outline-modern">Edit</a>
                             {% endif %}
@@ -192,57 +203,22 @@
         <div>
             <span class="eyebrow">Quick Add</span>
             <h5 class="modal-title">Add a document</h5>
-            <p class="modal-subtitle mb-0">Structured status choices, holder assignment, and optional file upload stay in the same quick-add flow.</p>
+            <p class="modal-subtitle mb-0">Forward a new document to a user immediately after upload.</p>
         </div>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <form method="POST" action="{{ url_for('add_document') }}" enctype="multipart/form-data">
         <div class="modal-body pt-0">
             <div class="row g-4">
-                <div class="col-md-6">
-                    <label class="form-label">Title</label>
-                    <input type="text" name="title" class="form-control modern-input" required>
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label">Category</label>
-                    <select name="category" class="form-select modern-input" required>
-                        {% for category in category_choices %}
-                        <option value="{{ category }}">{{ category }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label">Initial Status</label>
-                    <select name="current_status" class="form-select modern-input" required>
-                        {% for status in status_choices %}
-                        <option value="{{ status }}" {% if status == 'On Process' %}selected{% endif %}>{{ status }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label">Who Has the Document?</label>
-                    <select name="holder_user_id" class="form-select modern-input">
-                        <option value="">-- Not Assigned --</option>
-                        {% for user in users %}
-                        <option value="{{ user.id }}">{{ user.full_name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label">File</label>
-                    <input type="file" name="file" class="form-control modern-input">
-                    <div class="form-text">Maximum file size follows the configured app limit.</div>
-                </div>
-                <div class="col-12">
-                    <label class="form-label">Description</label>
-                    <textarea name="description" class="form-control modern-input" rows="4"></textarea>
-                </div>
+                <div class="col-md-6"><label class="form-label">Title</label><input type="text" name="title" class="form-control modern-input" required></div>
+                <div class="col-md-6"><label class="form-label">Category</label><select name="category" class="form-select modern-input" required>{% for category in category_choices %}<option value="{{ category }}">{{ category }}</option>{% endfor %}</select></div>
+                <div class="col-md-6"><label class="form-label">Initial Status</label><select name="current_status" class="form-select modern-input" required>{% for status in status_choices %}<option value="{{ status }}" {% if status == 'On Process' %}selected{% endif %}>{{ status }}</option>{% endfor %}</select></div>
+                <div class="col-md-6"><label class="form-label">Forwarded To</label><select name="holder_user_id" class="form-select modern-input"><option value="">-- Not Assigned --</option>{% for user in users %}<option value="{{ user.id }}">{{ user.full_name }}</option>{% endfor %}</select></div>
+                <div class="col-md-6"><label class="form-label">File</label><input type="file" name="file" class="form-control modern-input"><div class="form-text">Maximum file size follows the configured app limit.</div></div>
+                <div class="col-12"><label class="form-label">Description</label><textarea name="description" class="form-control modern-input" rows="4"></textarea></div>
             </div>
         </div>
-        <div class="modal-footer border-0">
-          <button type="button" class="btn btn-outline-modern" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-primary-soft">Save Document</button>
-        </div>
+        <div class="modal-footer border-0"><button type="button" class="btn btn-outline-modern" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary-soft">Save Document</button></div>
       </form>
     </div>
   </div>
@@ -251,48 +227,26 @@
 <div class="modal fade" id="statusModal" tabindex="-1">
   <div class="modal-dialog modal-lg modal-dialog-centered">
     <div class="modal-content modern-modal">
-      <div class="modal-header border-0">
-        <div>
-            <span class="eyebrow">Status Update</span>
-            <h5 class="modal-title">Update document workflow</h5>
-            <p class="modal-subtitle mb-0">Choose the latest holder and leave a remark for the activity trail.</p>
-        </div>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
+      <div class="modal-header border-0"><div><span class="eyebrow">Status Update</span><h5 class="modal-title">Update document workflow</h5><p class="modal-subtitle mb-0">Choose the latest status, forwarded user, and action taken.</p></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
       <form id="statusForm">
         <div class="modal-body pt-0">
             <input type="hidden" id="document_id">
-            <div class="mb-3">
-                <label class="form-label">Document</label>
-                <input type="text" id="document_title" class="form-control modern-input" readonly>
-            </div>
-            <div class="mb-3">
-                <label class="form-label">New Status</label>
-                <select id="new_status" class="form-select modern-input" required>
-                    {% for status in status_choices %}
-                    <option value="{{ status }}">{{ status }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Who Has the Document?</label>
-                <select id="holder_user_id" class="form-select modern-input">
-                    <option value="">-- Not Assigned --</option>
-                    {% for user in users %}
-                    <option value="{{ user.id }}">{{ user.full_name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Remarks</label>
-                <textarea id="remarks" class="form-control modern-input" rows="3" placeholder="Add a note about what changed"></textarea>
-            </div>
+            <div class="mb-3"><label class="form-label">Document</label><input type="text" id="document_title" class="form-control modern-input" readonly></div>
+            <div class="mb-3"><label class="form-label">New Status</label><select id="new_status" class="form-select modern-input" required>{% for status in status_choices %}<option value="{{ status }}">{{ status }}</option>{% endfor %}</select></div>
+            <div class="mb-3"><label class="form-label">Forwarded To</label><select id="holder_user_id" class="form-select modern-input"><option value="">-- Not Assigned --</option>{% for user in users %}<option value="{{ user.id }}">{{ user.full_name }}</option>{% endfor %}</select></div>
+            <div class="mb-3"><label class="form-label">Action Taken</label><textarea id="remarks" class="form-control modern-input" rows="3" placeholder="Add the action taken for this document"></textarea></div>
         </div>
-        <div class="modal-footer border-0">
-          <button type="button" class="btn btn-outline-modern" data-bs-dismiss="modal">Close</button>
-          <button type="submit" class="btn btn-primary-soft">Save Update</button>
-        </div>
+        <div class="modal-footer border-0"><button type="button" class="btn btn-outline-modern" data-bs-dismiss="modal">Close</button><button type="submit" class="btn btn-primary-soft">Save Update</button></div>
       </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="detailsModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content modern-modal">
+      <div class="modal-header border-0"><div><span class="eyebrow">Document Details</span><h5 class="modal-title" id="detailsTitle">Loading...</h5><p class="modal-subtitle mb-0" id="detailsSubtitle"></p></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body pt-0" id="detailsContent">Loading...</div>
     </div>
   </div>
 </div>
@@ -300,17 +254,8 @@
 <div class="modal fade" id="historyModal" tabindex="-1">
   <div class="modal-dialog modal-xl modal-dialog-centered">
     <div class="modal-content modern-modal">
-      <div class="modal-header border-0">
-        <div>
-            <span class="eyebrow">Activity Trail</span>
-            <h5 class="modal-title">Document status history</h5>
-            <p class="modal-subtitle mb-0" id="historySubtitle">Everything that happened to this document.</p>
-        </div>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body pt-0" id="historyContent">
-        Loading...
-      </div>
+      <div class="modal-header border-0"><div><span class="eyebrow">Activity Trail</span><h5 class="modal-title">Document status history</h5><p class="modal-subtitle mb-0" id="historySubtitle">Everything that happened to this document.</p></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body pt-0" id="historyContent">Loading...</div>
     </div>
   </div>
 </div>
@@ -320,93 +265,126 @@
 <script>
 const statusModal = new bootstrap.Modal(document.getElementById('statusModal'));
 const historyModal = new bootstrap.Modal(document.getElementById('historyModal'));
+const detailsModal = new bootstrap.Modal(document.getElementById('detailsModal'));
 const addDocumentModalElement = document.getElementById('addDocumentModal');
 const addDocumentModal = new bootstrap.Modal(addDocumentModalElement);
+let liveCountsSnapshot = { total: {{ total_docs }}, active: {{ process_docs }}, settled: {{ settled_docs }} };
+let userIsTyping = false;
 
-if ("{{ open_modal }}" === "add-document") {
-    addDocumentModal.show();
+if ("{{ open_modal }}" === "add-document") addDocumentModal.show();
+
+document.querySelectorAll('input, textarea, select').forEach(element => {
+    element.addEventListener('focus', () => userIsTyping = true);
+    element.addEventListener('blur', () => setTimeout(() => userIsTyping = false, 1000));
+});
+
+function anyModalOpen() {
+    return document.querySelectorAll('.modal.show').length > 0;
+}
+
+function fillStatusModal(id, title, status, holder) {
+    document.getElementById('document_id').value = id;
+    document.getElementById('document_title').value = title;
+    document.getElementById('new_status').value = status;
+    document.getElementById('holder_user_id').value = holder || '';
+    document.getElementById('remarks').value = '';
+    statusModal.show();
 }
 
 document.querySelectorAll('.status-btn').forEach(btn => {
     btn.addEventListener('click', function () {
-        document.getElementById('document_id').value = this.dataset.id;
-        document.getElementById('document_title').value = this.dataset.title;
-        document.getElementById('new_status').value = this.dataset.status;
-        document.getElementById('holder_user_id').value = this.dataset.holder;
-        document.getElementById('remarks').value = '';
-        statusModal.show();
+        fillStatusModal(this.dataset.id, this.dataset.title, this.dataset.status, this.dataset.holder);
     });
 });
+
+async function submitStatusUpdate(id, status, holder, remarks) {
+    const formData = new FormData();
+    formData.append('new_status', status);
+    formData.append('holder_user_id', holder || '');
+    formData.append('remarks', remarks || '');
+    const response = await fetch(`/documents/update_status/${id}`, { method: 'POST', body: formData });
+    return response.json();
+}
 
 document.getElementById('statusForm').addEventListener('submit', async function(e) {
     e.preventDefault();
-    const id = document.getElementById('document_id').value;
-    const formData = new FormData();
-    formData.append('new_status', document.getElementById('new_status').value);
-    formData.append('holder_user_id', document.getElementById('holder_user_id').value);
-    formData.append('remarks', document.getElementById('remarks').value);
-
-    const response = await fetch(`/documents/update_status/${id}`, {
-        method: 'POST',
-        body: formData
-    });
-
-    const data = await response.json();
+    const data = await submitStatusUpdate(
+        document.getElementById('document_id').value,
+        document.getElementById('new_status').value,
+        document.getElementById('holder_user_id').value,
+        document.getElementById('remarks').value
+    );
     alert(data.message);
-    if (data.success) {
-        location.reload();
-    }
+    if (data.success) location.reload();
 });
+
+async function showDocumentDetails(id) {
+    const response = await fetch(`/documents/details/${id}`, { cache: 'no-store' });
+    const data = await response.json();
+    if (!data.success) {
+        alert(data.message || 'Document details could not be loaded.');
+        return;
+    }
+    const doc = data.document;
+    document.getElementById('detailsTitle').textContent = doc.title;
+    document.getElementById('detailsSubtitle').textContent = `${doc.doc_no} - ${doc.current_status}`;
+    document.getElementById('detailsContent').innerHTML = `
+        <div class="details-grid">
+            <div><span class="timeline-label">Category</span><strong>${doc.category}</strong></div>
+            <div><span class="timeline-label">Forwarded To</span><strong>${doc.forwarded_to}</strong></div>
+            <div><span class="timeline-label">Uploaded By</span><strong>${doc.uploaded_by}</strong></div>
+            <div><span class="timeline-label">File</span><strong>${doc.original_file_name}</strong></div>
+            <div><span class="timeline-label">Created</span><strong>${doc.created_at}</strong></div>
+            <div><span class="timeline-label">Updated</span><strong>${doc.updated_at}</strong></div>
+        </div>
+        <div class="details-description mt-3"><span class="timeline-label">Description</span><p>${doc.description}</p></div>
+    `;
+    detailsModal.show();
+}
+
+document.querySelectorAll('.view-doc-btn').forEach(btn => btn.addEventListener('click', () => showDocumentDetails(btn.dataset.id)));
+window.addEventListener('open-document-details', event => showDocumentDetails(event.detail.id));
 
 document.querySelectorAll('.history-btn').forEach(btn => {
     btn.addEventListener('click', async function() {
         const id = this.dataset.id;
         const title = this.dataset.title;
         document.getElementById('historySubtitle').textContent = `Everything that happened to "${title}".`;
-        const response = await fetch(`/documents/history/${id}`);
+        const response = await fetch(`/documents/history/${id}`, { cache: 'no-store' });
         const data = await response.json();
-
         if (data.length === 0) {
             document.getElementById('historyContent').innerHTML = '<div class="empty-history">No status history found for this document yet.</div>';
         } else {
-            const html = data.map((item, index) => `
-                <div class="timeline-entry">
-                    <div class="timeline-dot"></div>
-                    <div class="timeline-card">
-                        <div class="timeline-head">
-                            <div>
-                                <span class="timeline-step">Update ${data.length - index}</span>
-                                <h6>${item.new_status}</h6>
-                            </div>
-                            <span class="timeline-date">${item.updated_at}</span>
-                        </div>
-                        <div class="timeline-grid">
-                            <div>
-                                <span class="timeline-label">Previous Status</span>
-                                <strong>${item.old_status || 'Initial entry'}</strong>
-                            </div>
-                            <div>
-                                <span class="timeline-label">Current Holder</span>
-                                <strong>${item.holder_name}</strong>
-                            </div>
-                            <div>
-                                <span class="timeline-label">Updated By</span>
-                                <strong>${item.updated_by_name}</strong>
-                            </div>
-                            <div>
-                                <span class="timeline-label">Remarks</span>
-                                <strong>${item.remarks || 'No remarks added'}</strong>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `).join('');
-
-            document.getElementById('historyContent').innerHTML = `<div class="timeline">${html}</div>`;
+            document.getElementById('historyContent').innerHTML = `<div class="timeline">${data.map((item, index) => `
+                <div class="timeline-entry"><div class="timeline-dot"></div><div class="timeline-card">
+                    <div class="timeline-head"><div><span class="timeline-step">Update ${data.length - index}</span><h6>${item.new_status}</h6></div><span class="timeline-date">${item.updated_at}</span></div>
+                    <div class="timeline-grid"><div><span class="timeline-label">Previous Status</span><strong>${item.old_status || 'Initial entry'}</strong></div><div><span class="timeline-label">Forwarded To</span><strong>${item.holder_name}</strong></div><div><span class="timeline-label">Updated By</span><strong>${item.updated_by_name}</strong></div><div><span class="timeline-label">Action Taken</span><strong>${item.remarks || 'No action added'}</strong></div></div>
+                </div></div>`).join('')}</div>`;
         }
-
         historyModal.show();
     });
 });
+
+async function refreshLiveCounts() {
+    try {
+        const response = await fetch('{{ url_for("dashboard_counts") }}', { cache: 'no-store' });
+        if (!response.ok) return;
+        const counts = await response.json();
+        document.querySelectorAll('[data-live-count="total"]').forEach(el => el.textContent = counts.total);
+        document.querySelectorAll('[data-live-count="active"]').forEach(el => el.textContent = counts.active);
+        document.querySelectorAll('[data-live-count="settled"]').forEach(el => el.textContent = counts.settled);
+        document.getElementById('liveSyncTime').textContent = counts.server_time;
+        const changed = counts.total !== liveCountsSnapshot.total || counts.active !== liveCountsSnapshot.active || counts.settled !== liveCountsSnapshot.settled;
+        liveCountsSnapshot = counts;
+        if (changed && !anyModalOpen() && !userIsTyping && !document.hidden) {
+            setTimeout(() => location.reload(), 1200);
+        }
+    } catch (error) {
+        console.warn('Live refresh failed.', error);
+    }
+}
+
+setInterval(refreshLiveCounts, 10000);
+refreshLiveCounts();
 </script>
 {% endblock %}

@@ -19,25 +19,13 @@
         <div class="container-fluid topbar-inner">
             <a class="brand-lockup" href="{{ url_for('dashboard') }}">
                 <span class="brand-pill">TSD</span>
-                <span class="brand-copy">
-                    <strong>Document Management</strong>
-                    <small>Fast, traceable, modern workflows</small>
-                </span>
+                <span class="brand-copy"><strong>Document Management</strong><small>Fast, traceable, modern workflows</small></span>
             </a>
-
             {% if session.get('user_id') %}
             <div class="topbar-actions">
                 <a href="{{ url_for('dashboard') }}" class="nav-chip {% if request.endpoint in ['dashboard', 'documents', 'add_document', 'edit_document'] %}active{% endif %}">Workspace</a>
-                {% if session.get('role') == 'admin' %}
-                <a href="{{ url_for('users') }}" class="nav-chip {% if request.endpoint in ['users', 'add_user', 'edit_user'] %}active{% endif %}">Users</a>
-                {% endif %}
-                <div class="profile-pill">
-                    <span class="profile-dot"></span>
-                    <div>
-                        <strong>{{ session.get('full_name') }}</strong>
-                        <small>{{ session.get('role')|title }}</small>
-                    </div>
-                </div>
+                {% if session.get('role') == 'admin' %}<a href="{{ url_for('users') }}" class="nav-chip {% if request.endpoint in ['users', 'add_user', 'edit_user'] %}active{% endif %}">Users</a>{% endif %}
+                <div class="profile-pill"><span class="profile-dot"></span><div><strong>{{ session.get('full_name') }}</strong><small>{{ session.get('role')|title }}</small></div></div>
                 <a href="{{ url_for('logout') }}" class="btn btn-danger-soft">Logout</a>
             </div>
             {% endif %}
@@ -50,41 +38,61 @@
                 <div class="alert-stack">
                     {% for category, message in messages %}
                         <div class="alert alert-{{ category }} alert-dismissible fade show modern-alert" role="alert">
-                            <div>
-                                <strong>{{ category|title }}</strong>
-                                <span>{{ message }}</span>
-                            </div>
+                            <div><strong>{{ category|title }}</strong><span>{{ message }}</span></div>
                             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                         </div>
                     {% endfor %}
                 </div>
             {% endif %}
         {% endwith %}
-
         {% block content %}{% endblock %}
     </main>
+
     {% if session.get('user_id') %}
     <div class="modal fade" id="documentNotificationModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content modern-modal">
                 <div class="modal-header border-0">
                     <div>
                         <span class="eyebrow">New Document</span>
                         <h5 class="modal-title">A document was forwarded to you</h5>
-                        <p class="modal-subtitle mb-0">Please review the newly received document in your workspace.</p>
+                        <p class="modal-subtitle mb-0">You can view the details or update the status right away.</p>
                     </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body pt-0">
-                    <div class="notification-doc-card">
+                    <div class="notification-doc-card mb-3">
                         <span id="notificationDocNo" class="doc-id"></span>
                         <h6 id="notificationDocTitle"></h6>
                         <p id="notificationDocMeta"></p>
                     </div>
+                    <form id="notificationStatusForm">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">New Status</label>
+                                <select id="notificationStatus" class="form-select modern-input" required>
+                                    {% for status in config.STATUS_CHOICES %}<option value="{{ status }}">{{ status }}</option>{% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Forwarded To</label>
+                                <select id="notificationForwardedTo" class="form-select modern-input">
+                                    <option value="{{ session.get('user_id') }}">Keep forwarded to me</option>
+                                    <option value="">-- Not Assigned --</option>
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Action Taken</label>
+                                <textarea id="notificationActionTaken" class="form-control modern-input" rows="3" placeholder="Add the action taken for this document"></textarea>
+                            </div>
+                        </div>
+                    </form>
                 </div>
                 <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-outline-modern" id="notificationViewBtn">View</button>
                     <button type="button" class="btn btn-outline-modern" data-bs-dismiss="modal">Later</button>
-                    <button type="button" class="btn btn-primary-soft" id="notificationAcknowledgeBtn">Got it</button>
+                    <button type="button" class="btn btn-primary-soft" id="notificationSaveStatusBtn">Save Status</button>
+                    <button type="button" class="btn btn-dark-soft" id="notificationAcknowledgeBtn">Got it</button>
                 </div>
             </div>
         </div>
@@ -105,36 +113,25 @@ const labelReplacements = new Map([
 function replaceWorkflowLabels(root = document) {
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     const nodes = [];
-    while (walker.nextNode()) {
-        nodes.push(walker.currentNode);
-    }
+    while (walker.nextNode()) nodes.push(walker.currentNode);
     nodes.forEach(node => {
         const trimmed = node.nodeValue.trim();
-        if (labelReplacements.has(trimmed)) {
-            node.nodeValue = node.nodeValue.replace(trimmed, labelReplacements.get(trimmed));
-        }
+        if (labelReplacements.has(trimmed)) node.nodeValue = node.nodeValue.replace(trimmed, labelReplacements.get(trimmed));
     });
     document.querySelectorAll('[placeholder]').forEach(element => {
-        if (element.placeholder.includes('Add a note about what changed')) {
-            element.placeholder = 'Add the action taken for this document';
-        }
+        if (element.placeholder.includes('Add a note about what changed')) element.placeholder = 'Add the action taken for this document';
     });
 }
-
 replaceWorkflowLabels();
-new MutationObserver(mutations => {
-    mutations.forEach(mutation => {
-        mutation.addedNodes.forEach(node => {
-            if (node.nodeType === Node.ELEMENT_NODE) {
-                replaceWorkflowLabels(node);
-            }
-        });
-    });
-}).observe(document.body, { childList: true, subtree: true });
+new MutationObserver(mutations => mutations.forEach(mutation => mutation.addedNodes.forEach(node => {
+    if (node.nodeType === Node.ELEMENT_NODE) replaceWorkflowLabels(node);
+}))).observe(document.body, { childList: true, subtree: true });
 
 const notificationModalElement = document.getElementById('documentNotificationModal');
 const notificationModal = notificationModalElement ? new bootstrap.Modal(notificationModalElement) : null;
 const notificationAcknowledgeBtn = document.getElementById('notificationAcknowledgeBtn');
+const notificationSaveStatusBtn = document.getElementById('notificationSaveStatusBtn');
+const notificationViewBtn = document.getElementById('notificationViewBtn');
 let activeNotification = null;
 let notificationVisible = false;
 
@@ -143,31 +140,25 @@ async function markNotificationSeen(notificationId) {
 }
 
 function showDocumentNotification(item) {
-    if (!notificationModal || notificationVisible) {
-        return;
-    }
+    if (!notificationModal || notificationVisible) return;
     activeNotification = item;
     notificationVisible = true;
     document.getElementById('notificationDocNo').textContent = item.doc_no;
     document.getElementById('notificationDocTitle').textContent = item.title;
-    document.getElementById('notificationDocMeta').textContent =
-        `${item.category || 'Uncategorized'} - ${item.current_status} - Forwarded by ${item.assigned_by_name}`;
+    document.getElementById('notificationDocMeta').textContent = `${item.category || 'Uncategorized'} - ${item.current_status} - Forwarded by ${item.assigned_by_name} - ${item.created_at}`;
+    document.getElementById('notificationStatus').value = item.current_status;
+    document.getElementById('notificationForwardedTo').value = item.holder_user_id || '{{ session.get('user_id') }}';
+    document.getElementById('notificationActionTaken').value = '';
     notificationModal.show();
 }
 
 async function checkDocumentNotifications() {
-    if (!notificationModal || document.hidden) {
-        return;
-    }
+    if (!notificationModal || document.hidden || notificationVisible) return;
     try {
         const response = await fetch('{{ url_for("pending_notifications") }}', { cache: 'no-store' });
-        if (!response.ok) {
-            return;
-        }
+        if (!response.ok) return;
         const notifications = await response.json();
-        if (notifications.length > 0) {
-            showDocumentNotification(notifications[0]);
-        }
+        if (notifications.length > 0) showDocumentNotification(notifications[0]);
     } catch (error) {
         console.warn('Notification check failed.', error);
     }
@@ -175,11 +166,28 @@ async function checkDocumentNotifications() {
 
 if (notificationAcknowledgeBtn) {
     notificationAcknowledgeBtn.addEventListener('click', async () => {
-        if (activeNotification) {
-            await markNotificationSeen(activeNotification.id);
-        }
+        if (activeNotification) await markNotificationSeen(activeNotification.id);
         notificationModal.hide();
-        location.href = '{{ url_for("dashboard") }}';
+    });
+}
+
+if (notificationSaveStatusBtn) {
+    notificationSaveStatusBtn.addEventListener('click', async () => {
+        if (!activeNotification) return;
+        const formData = new FormData();
+        formData.append('new_status', document.getElementById('notificationStatus').value);
+        formData.append('holder_user_id', document.getElementById('notificationForwardedTo').value);
+        formData.append('remarks', document.getElementById('notificationActionTaken').value);
+        const response = await fetch(`/notifications/${activeNotification.id}/update_status`, { method: 'POST', body: formData });
+        const data = await response.json();
+        alert(data.message);
+        if (data.success) location.reload();
+    });
+}
+
+if (notificationViewBtn) {
+    notificationViewBtn.addEventListener('click', () => {
+        if (activeNotification) window.dispatchEvent(new CustomEvent('open-document-details', { detail: { id: activeNotification.document_id } }));
     });
 }
 
@@ -191,13 +199,10 @@ if (notificationModalElement) {
 }
 
 checkDocumentNotifications();
-setInterval(checkDocumentNotifications, 30000);
-document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) {
-        checkDocumentNotifications();
-    }
-});
+setInterval(checkDocumentNotifications, 5000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkDocumentNotifications(); });
 </script>
-{% endif %}{% block scripts %}{% endblock %}
+{% endif %}
+{% block scripts %}{% endblock %}
 </body>
 </html>
