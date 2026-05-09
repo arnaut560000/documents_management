@@ -856,3 +856,22 @@ a {
         min-width: 0;
     }
 }
+
+.notification-doc-card {
+    padding: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.72);
+}
+
+.notification-doc-card h6 {
+    margin: 0.45rem 0 0.35rem;
+    font-size: 1.05rem;
+    font-weight: 800;
+}
+
+.notification-doc-card p {
+    margin: 0;
+    color: var(--muted);
+    font-weight: 600;
+}

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -63,9 +63,141 @@
 
         {% block content %}{% endblock %}
     </main>
+    {% if session.get('user_id') %}
+    <div class="modal fade" id="documentNotificationModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content modern-modal">
+                <div class="modal-header border-0">
+                    <div>
+                        <span class="eyebrow">New Document</span>
+                        <h5 class="modal-title">A document was forwarded to you</h5>
+                        <p class="modal-subtitle mb-0">Please review the newly received document in your workspace.</p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body pt-0">
+                    <div class="notification-doc-card">
+                        <span id="notificationDocNo" class="doc-id"></span>
+                        <h6 id="notificationDocTitle"></h6>
+                        <p id="notificationDocMeta"></p>
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-outline-modern" data-bs-dismiss="modal">Later</button>
+                    <button type="button" class="btn btn-primary-soft" id="notificationAcknowledgeBtn">Got it</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-{% block scripts %}{% endblock %}
+{% if session.get('user_id') %}
+<script>
+const labelReplacements = new Map([
+    ['Who Has the Document?', 'Forwarded To'],
+    ['Holder', 'Forwarded To'],
+    ['Current Holder', 'Forwarded To'],
+    ['Remarks', 'Action Taken']
+]);
+
+function replaceWorkflowLabels(root = document) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    while (walker.nextNode()) {
+        nodes.push(walker.currentNode);
+    }
+    nodes.forEach(node => {
+        const trimmed = node.nodeValue.trim();
+        if (labelReplacements.has(trimmed)) {
+            node.nodeValue = node.nodeValue.replace(trimmed, labelReplacements.get(trimmed));
+        }
+    });
+    document.querySelectorAll('[placeholder]').forEach(element => {
+        if (element.placeholder.includes('Add a note about what changed')) {
+            element.placeholder = 'Add the action taken for this document';
+        }
+    });
+}
+
+replaceWorkflowLabels();
+new MutationObserver(mutations => {
+    mutations.forEach(mutation => {
+        mutation.addedNodes.forEach(node => {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+                replaceWorkflowLabels(node);
+            }
+        });
+    });
+}).observe(document.body, { childList: true, subtree: true });
+
+const notificationModalElement = document.getElementById('documentNotificationModal');
+const notificationModal = notificationModalElement ? new bootstrap.Modal(notificationModalElement) : null;
+const notificationAcknowledgeBtn = document.getElementById('notificationAcknowledgeBtn');
+let activeNotification = null;
+let notificationVisible = false;
+
+async function markNotificationSeen(notificationId) {
+    await fetch(`/notifications/${notificationId}/seen`, { method: 'POST' });
+}
+
+function showDocumentNotification(item) {
+    if (!notificationModal || notificationVisible) {
+        return;
+    }
+    activeNotification = item;
+    notificationVisible = true;
+    document.getElementById('notificationDocNo').textContent = item.doc_no;
+    document.getElementById('notificationDocTitle').textContent = item.title;
+    document.getElementById('notificationDocMeta').textContent =
+        `${item.category || 'Uncategorized'} - ${item.current_status} - Forwarded by ${item.assigned_by_name}`;
+    notificationModal.show();
+}
+
+async function checkDocumentNotifications() {
+    if (!notificationModal || document.hidden) {
+        return;
+    }
+    try {
+        const response = await fetch('{{ url_for("pending_notifications") }}', { cache: 'no-store' });
+        if (!response.ok) {
+            return;
+        }
+        const notifications = await response.json();
+        if (notifications.length > 0) {
+            showDocumentNotification(notifications[0]);
+        }
+    } catch (error) {
+        console.warn('Notification check failed.', error);
+    }
+}
+
+if (notificationAcknowledgeBtn) {
+    notificationAcknowledgeBtn.addEventListener('click', async () => {
+        if (activeNotification) {
+            await markNotificationSeen(activeNotification.id);
+        }
+        notificationModal.hide();
+        location.href = '{{ url_for("dashboard") }}';
+    });
+}
+
+if (notificationModalElement) {
+    notificationModalElement.addEventListener('hidden.bs.modal', () => {
+        notificationVisible = false;
+        activeNotification = null;
+    });
+}
+
+checkDocumentNotifications();
+setInterval(checkDocumentNotifications, 30000);
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+        checkDocumentNotifications();
+    }
+});
+</script>
+{% endif %}{% block scripts %}{% endblock %}
 </body>
 </html>

@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+﻿{% extends 'base.html' %}
 {% block content %}
 <div class="glass-panel category-analytics mb-4">
     <div class="panel-header">
@@ -57,7 +57,7 @@
             <div class="category-recent-item">
                 <div>
                     <strong>{{ doc.title }}</strong>
-                    <span>{{ doc.doc_no }} · Updated {{ doc.updated_at }}</span>
+                    <span>{{ doc.doc_no }} Â· Updated {{ doc.updated_at }}</span>
                 </div>
                 <span class="status-chip">{{ doc.current_status }}</span>
             </div>
@@ -170,7 +170,9 @@
                     </td>
                     <td class="action-group-cell">
                         <div class="action-group">
+                            {% if doc.uploaded_by == session.get('user_id') %}
                             <a href="{{ url_for('edit_document', id=doc.id) }}" class="btn btn-sm btn-outline-modern">Edit</a>
+                            {% endif %}
                             <button class="btn btn-sm btn-dark-soft history-btn" data-id="{{ doc.id }}" data-title="{{ doc.title }}">See Status</button>
                         </div>
                     </td>

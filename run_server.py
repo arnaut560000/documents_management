@@ -3,6 +3,10 @@ import os
 from waitress import serve
 
 from app import app
+from neeco_updates import apply as apply_neeco_updates
+
+
+apply_neeco_updates(app)
 
 
 if __name__ == "__main__":
