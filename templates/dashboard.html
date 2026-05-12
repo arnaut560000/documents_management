@@ -181,7 +181,7 @@
                     <td class="action-group-cell">
                         <div class="action-group">
                             <button class="btn btn-sm btn-outline-modern view-doc-btn" data-id="{{ doc.id }}">View</button>
-                            {% if doc.uploaded_by == session.get('user_id') %}
+                            {% if session.get('role') == 'admin' or doc.uploaded_by == session.get('user_id') %}
                             <a href="{{ url_for('edit_document', id=doc.id) }}" class="btn btn-sm btn-outline-modern">Edit</a>
                             {% endif %}
                             <button class="btn btn-sm btn-dark-soft history-btn" data-id="{{ doc.id }}" data-title="{{ doc.title }}">See Status</button>

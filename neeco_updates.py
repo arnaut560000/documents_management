@@ -19,7 +19,11 @@ def _same_user(left, right):
 
 
 def _user_can_edit_document(document):
-    return bool(document) and _same_user(document["uploaded_by"], session.get("user_id"))
+    if not document:
+        return False
+    if session.get("role") == "admin":
+        return True
+    return _same_user(document["uploaded_by"], session.get("user_id"))
 
 
 def _format_ph_time(value):
